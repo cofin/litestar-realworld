@@ -3,26 +3,24 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, cast
 
-from sqlalchemy import Column, pool
-from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
-
 from advanced_alchemy.base import orm_registry
 from alembic import context
 from alembic.autogenerate import rewriter
 from alembic.operations import ops
+from sqlalchemy import Column, pool
+from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine import Connection
-
     from advanced_alchemy.alembic.commands import AlembicCommandConfig
     from alembic.runtime.environment import EnvironmentContext
+    from sqlalchemy.engine import Connection
 
 __all__ = ["do_run_migrations", "run_migrations_offline", "run_migrations_online"]
 
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
-config: AlembicCommandConfig = context.config  # type: ignore  # noqa: PGH003
+config: AlembicCommandConfig = context.config  # type: ignore
 
 
 # add your model's MetaData object here
@@ -38,8 +36,8 @@ writer = rewriter.Rewriter()
 
 @writer.rewrites(ops.CreateTableOp)
 def order_columns(
-    context: EnvironmentContext,  # noqa: ARG001
-    revision: tuple[str, ...],  # noqa: ARG001
+    context: EnvironmentContext,
+    revision: tuple[str, ...],
     op: ops.CreateTableOp,
 ) -> ops.CreateTableOp:
     """Orders ID first and the audit columns at the end."""
@@ -56,8 +54,8 @@ def order_columns(
         op.table_name,
         columns,
         schema=op.schema,
-        # TODO: Remove when https://github.com/sqlalchemy/alembic/issues/1193 is fixed  # noqa: FIX002
-        _namespace_metadata=op._namespace_metadata,  # noqa: SLF001
+        # TODO: Remove when https://github.com/sqlalchemy/alembic/issues/1193 is fixed
+        _namespace_metadata=op._namespace_metadata,
         **op.kw,
     )
 

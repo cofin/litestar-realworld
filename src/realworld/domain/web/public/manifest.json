@@ -1,0 +1,12 @@
+{
+  "src/realworld/domain/web/resources/main.css": {
+    "file": "assets/main-d56e455f.css",
+    "isEntry": true,
+    "src": "src/realworld/domain/web/resources/main.css"
+  },
+  "src/realworld/domain/web/resources/main.js": {
+    "file": "assets/main-cd0c549b.js",
+    "isEntry": true,
+    "src": "src/realworld/domain/web/resources/main.js"
+  }
+}

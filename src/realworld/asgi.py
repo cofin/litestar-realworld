@@ -14,15 +14,17 @@ def create_app() -> Litestar:
     from litestar.openapi.config import OpenAPIConfig
 
     from realworld.domain import plugins
+    from realworld.domain.web.controllers import WebController
 
     return Litestar(
+        route_handlers=[WebController],
         openapi_config=OpenAPIConfig(
             title="Realworld",
             version="1.0.0",
             use_handler_docstrings=True,
             root_schema_site="swagger",
         ),
-        plugins=[plugins.alchemy, plugins.litestar_users],
+        plugins=[plugins.alchemy, plugins.litestar_users, plugins.vite],
         experimental_features=[ExperimentalFeatures.DTO_CODEGEN],
     )
 

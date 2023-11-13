@@ -14,11 +14,10 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "litestar[standard,sqlalchemy] @ git+https://github.com/litestar-org/litestar.git",
-  "greenlet; sys_platform == \"darwin\"",
-  "python-dotenv>=1.0.0",
-  "aiosqlite",
-  "litestar-users>=1.0.0rc3",
+    "litestar[standard,sqlalchemy]",
+    "aiosqlite",
+    "litestar-users>=1.0.0rc3",
+    "litestar-vite @ git+https://github.com/cofin/litestar-vite.git@vite-install",
 ]
 description = "Opinionated template for a Litestar application."
 keywords = ["litestar", "realworld"]
