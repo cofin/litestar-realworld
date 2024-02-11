@@ -5,7 +5,7 @@ from advanced_alchemy.config import AlembicAsyncConfig
 from advanced_alchemy.extensions.litestar import SQLAlchemyAsyncConfig
 from advanced_alchemy.extensions.litestar.plugins.init.config.asyncio import autocommit_before_send_handler
 
-from realworld.utils import module_to_os_path
+from conduit.utils import module_to_os_path
 
 DEFAULT_MODULE_NAME = "realworld"
 BASE_DIR: Final = module_to_os_path(DEFAULT_MODULE_NAME)

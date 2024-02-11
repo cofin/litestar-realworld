@@ -14,10 +14,10 @@ from litestar_users.config import (
 )
 from litestar_vite import ViteConfig, VitePlugin
 
-from realworld import config
-from realworld.domain.accounts import UserReadDTO, UserRegistrationDTO, UserService, UserUpdateDTO
-from realworld.domain.security import requires_superuser
-from realworld.lib.db.models import User
+from conduit import config
+from conduit.db.models import User
+from conduit.domain.accounts import UserReadDTO, UserRegistrationDTO, UserService, UserUpdateDTO
+from conduit.domain.security import requires_superuser
 
 here = Path(__file__).parent
 

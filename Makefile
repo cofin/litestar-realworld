@@ -71,20 +71,49 @@ clean: 												## Cleanup temporary build artifacts
 	@find . -name '.ipynb_checkpoints' -exec rm -rf {} +
 
 destroy-venv: 											## Destroy the virtual environment
+	@echo "=> Cleaning Python virtual environment"
 	@rm -rf .venv
 
 destroy-node_modules: 											## Destroy the node environment
+	@echo "=> Cleaning Node modules"
 	@rm -rf node_modules
 
 migrations:       ## Generate database migrations
 	@echo "ATTENTION: This operation will create a new database migration for any defined models changes."
 	@while [ -z "$$MIGRATION_MESSAGE" ]; do read -r -p "Migration message: " MIGRATION_MESSAGE; done ;
-	@$(ENV_PREFIX)realworld database make-migrations --autogenerate -m "$${MIGRATION_MESSAGE}"
+	@$(ENV_PREFIX)conduit database make-migrations --autogenerate -m "$${MIGRATION_MESSAGE}"
 
 .PHONY: migrate
 migrate:          ## Generate database migrations
 	@echo "ATTENTION: Will apply all database migrations."
-	@$(ENV_PREFIX)realworld database upgrade
+	@$(ENV_PREFIX)conduit database upgrade
+
+.PHONY: build
+build:
+	@echo "=> Building package..."
+	@if [ "$(USING_PDM)" ]; then pdm build; fi
+	@echo "=> Package build complete..."
+
+.PHONY: refresh-lockfiles
+refresh-lockfiles:                                 ## Sync lockfiles with requirements files.
+	@pdm update --update-reuse --group :all
+
+.PHONY: lock
+lock:                                             ## Rebuild lockfiles from scratch, updating all dependencies
+	@pdm update --update-eager --group :all
+
+
+tidy: clean destroy-venv destroy-node_modules ## Clean up everything
+
+migrations:       ## Generate database migrations
+	@echo "ATTENTION: This operation will create a new database migration for any defined models changes."
+	@while [ -z "$$MIGRATION_MESSAGE" ]; do read -r -p "Migration message: " MIGRATION_MESSAGE; done ;
+	@$(ENV_PREFIX)app database make-migrations --autogenerate -m "$${MIGRATION_MESSAGE}"
+
+.PHONY: migrate
+migrate:          ## Generate database migrations
+	@echo "ATTENTION: Will apply all database migrations."
+	@$(ENV_PREFIX)app database upgrade
 
 .PHONY: build
 build:
@@ -107,6 +136,12 @@ lock:                                             ## Rebuild lockfiles from scra
 lint: 												## Runs pre-commit hooks; includes ruff linting, codespell, black
 	@echo "=> Running pre-commit process"
 	@$(ENV_PREFIX)pre-commit run --all-files
+	@echo "=> Pre-commit complete"
+
+.PHONY: format
+format: 												## Runs code formatting utilities
+	@echo "=> Running pre-commit process"
+	@$(ENV_PREFIX)ruff . --fix
 	@echo "=> Pre-commit complete"
 
 .PHONY: coverage

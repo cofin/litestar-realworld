@@ -9,7 +9,7 @@ def run_cli() -> None:
 
     current_path = Path(__file__).parent.parent.resolve()
     sys.path.append(str(current_path))
-    os.environ.setdefault("LITESTAR_APP", "realworld.asgi:app")
+    os.environ.setdefault("LITESTAR_APP", "conduit.asgi:app")
     try:
         from litestar.__main__ import run_cli as run_litestar_cli
 

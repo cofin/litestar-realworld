@@ -15,8 +15,11 @@ if TYPE_CHECKING:
     from alembic.runtime.environment import EnvironmentContext
     from sqlalchemy.engine import Connection
 
-__all__ = ["do_run_migrations", "run_migrations_offline", "run_migrations_online"]
-
+__all__ = (
+    "do_run_migrations",
+    "run_migrations_offline",
+    "run_migrations_online",
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -25,6 +28,7 @@ config: AlembicCommandConfig = context.config  # type: ignore
 
 # add your model's MetaData object here
 # for 'autogenerate' support
+
 target_metadata = orm_registry.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -41,7 +45,7 @@ def order_columns(
     op: ops.CreateTableOp,
 ) -> ops.CreateTableOp:
     """Orders ID first and the audit columns at the end."""
-    special_names = {"id": -100, "sa_orm_sentinel": 3001, "created_at": 3002, "updated_at": 3003}
+    special_names = {"id": -100, "sa_orm_sentinel": 3001, "created_at": 3002, "updated_at": 3002}
     cols_by_key = [
         (
             special_names.get(col.key, index) if isinstance(col, Column) else 2000,
@@ -125,7 +129,7 @@ async def run_migrations_online() -> None:
         ),
     )
     if connectable is None:
-        msg = "Could not get engine from config.  Please ensure your `alembic.ini` according to the official Alembic documentation."
+        msg = "Could not get engine from config.  Please ensure your `alembic.ini` according to the official Alembic documentation."  # type: ignore[unreachable]
         raise RuntimeError(
             msg,
         )

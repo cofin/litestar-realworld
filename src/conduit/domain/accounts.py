@@ -7,7 +7,7 @@ from advanced_alchemy.extensions.litestar.dto import SQLAlchemyDTO, SQLAlchemyDT
 from litestar.dto import MsgspecDTO
 from litestar_users.service import BaseUserService
 
-from realworld.lib.db.models import User
+from conduit.db.models import User
 
 
 class UserRegistration(msgspec.Struct):

@@ -13,8 +13,8 @@ def create_app() -> Litestar:
     from litestar.config.app import ExperimentalFeatures
     from litestar.openapi.config import OpenAPIConfig
 
-    from realworld.domain import plugins
-    from realworld.domain.web.controllers import WebController
+    from conduit.domain import plugins
+    from conduit.domain.web.controllers import WebController
 
     return Litestar(
         route_handlers=[WebController],
