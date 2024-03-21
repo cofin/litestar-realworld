@@ -1,19 +1,12 @@
-SHELL := /bin/bash
-# =============================================================================
-# Variables
-# =============================================================================
-
 .DEFAULT_GOAL:=help
 .ONESHELL:
-USING_PDM		          =	$(shell grep "tool.pdm" pyproject.toml && echo "yes")
-USING_NPM             = $(shell python3 -c "if __import__('pathlib').Path('package-lock.json').exists(): print('yes')")
+USING_NPM             	=$(shell python3 -c "if __import__('pathlib').Path('package-lock.json').exists(): print('yes')")
 ENV_PREFIX		        =.venv/bin/
-VENV_EXISTS           =	$(shell python3 -c "if __import__('pathlib').Path('.venv/bin/activate').exists(): print('yes')")
-NODE_MODULES_EXISTS		=	$(shell python3 -c "if __import__('pathlib').Path('node_modules').exists(): print('yes')")
-SRC_DIR               =src
-BUILD_DIR             =dist
-PDM_OPTS 		          ?=
-PDM 			            ?= 	pdm $(PDM_OPTS)
+VENV_EXISTS           	=$(shell python3 -c "if __import__('pathlib').Path('.venv/bin/activate').exists(): print('yes')")
+NODE_MODULES_EXISTS		=$(shell python3 -c "if __import__('pathlib').Path('node_modules').exists(): print('yes')")
+BUILD_DIR             	=dist
+SRC_DIR               	=src
+BASE_DIR              	=$(shell pwd)
 
 .EXPORT_ALL_VARIABLES:
 
@@ -22,45 +15,63 @@ ifndef VERBOSE
 endif
 
 
-.PHONY: help
-help: 		   										## Display this help text for Makefile
+help:  ## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
-
-
-.PHONY: upgrade
-upgrade:       										## Upgrade all dependencies to the latest stable versions
-	@echo "=> Updating all dependencies"
-	@if [ "$(USING_PDM)" ]; then $(PDM) update; fi
-	@echo "=> Python Dependencies Updated"
-	@if [ "$(USING_NPM)" ]; then npm upgrade --latest; fi
-	@echo "=> Node Dependencies Updated"
-	@$(ENV_PREFIX)pre-commit autoupdate
-	@echo "=> Updated Pre-commit"
 
 
 # =============================================================================
 # Developer Utils
 # =============================================================================
-install-pdm: 										## Install latest version of PDM
-	@curl -sSLO https://pdm.fming.dev/install-pdm.py && \
-	curl -sSL https://pdm.fming.dev/install-pdm.py.sha256 | shasum -a 256 -c - && \
-	python3 install-pdm.py
+install-pipx: 										## Install pipx
+	@python3 -m pip install --upgrade --user pipx
 
-install:											## Install the project and
-	@if ! $(PDM) --version > /dev/null; then echo '=> Installing PDM'; $(MAKE) install-pdm; fi
-	@if [ "$(VENV_EXISTS)" ]; then echo "=> Removing existing virtual environment"; fi
-	@if [ "$(VENV_EXISTS)" ]; then $(MAKE) destroy-venv; fi
-	@if [ "$(VENV_EXISTS)" ]; then $(MAKE) clean; fi
-	@if [ "$(NODE_MODULES_EXISTS)" ]; then echo "=> Removing existing node modules"; fi
-	@if [ "$(NODE_MODULES_EXISTS)" ]; then $(MAKE) destroy-node_modules; fi
-	@if [ "$(USING_PDM)" ]; then $(PDM) config venv.in_project true && python3 -m venv --copies .venv && . $(ENV_PREFIX)/activate && $(ENV_PREFIX)/pip install --quiet -U wheel setuptools cython pip mypy nodeenv; fi
-	@if [ "$(USING_PDM)" ]; then $(PDM) install -G:all; fi
+install-hatch: 										## Install Hatch, UV, and Ruff
+	@pipx install hatch --force
+	@pipx inject hatch ruff uv hatch-pip-compile hatch-vcs hatch-mypyc --include-deps --include-apps --force
+	@$(MAKE) configure-hatch
+
+configure-hatch: 										## Configure Hatch defaults
+	@hatch config set dirs.env.virtual .direnv
+	@hatch config set dirs.env.pip-compile .direnv
+	@npm config set fund false
+
+
+upgrade-hatch: 										## Update Hatch, UV, and Ruff
+	@pipx upgrade hatch --include-injected
+
+install: 										## Install the project and
+	@if ! pipx --version > /dev/null; then echo '=> Installing `pipx`'; $(MAKE) install-pipx ; fi
+	@if ! hatch --version > /dev/null; then echo '=> Installing `hatch` with `pipx`'; $(MAKE) install-hatch ; fi
+	@if ! hatch-pip-compile --version > /dev/null; then echo '=> Updating `hatch` and installing plugins'; $(MAKE) upgrade-hatch ; fi
+	@echo "=> Creating Python environments..."
+	@hatch env create local
+	@hatch env create lint
+	@hatch env create test
+	@hatch env create docs
+	@if [ "$(USING_NPM)" ]; then echo "=> Installing NPM packages..."; npm ci; fi
 	@echo "=> Install complete! Note: If you want to re-install re-run 'make install'"
 
+clean-install: 										## Install the project and
+	@if [ "$(VENV_EXISTS)" ]; then echo "=> Removing existing virtual environment"; $(MAKE) destroy-venv; fi
+	@$(MAKE) clean
+	@if [ "$(NODE_MODULES_EXISTS)" ]; then echo "=> Removing existing node modules"; $(MAKE) destroy-node_modules; fi
+	@$(MAKE) install
 
-clean: 												## Cleanup temporary build artifacts
+.PHONY: upgrade
+upgrade:       										## Upgrade all dependencies to the latest stable versions
+	@echo "=> Updating all dependencies"
+	@hatch-pip-compile --upgrade --all
+	@echo "=> Python Dependencies Updated"
+	@if [ "$(USING_NPM)" ]; then npm upgrade --latest; fi
+	@echo "=> Node Dependencies Updated"
+	@hatch run lint:pre-commit autoupdate
+	@echo "=> Updated Pre-commit"
+
+
+.PHONY: clean
+clean: 														## remove all build, testing, and static documentation files
 	@echo "=> Cleaning working directory"
-	@rm -rf .pytest_cache .ruff_cache .hypothesis build/ -rf dist/ .eggs/ .coverage coverage.xml coverage.json htmlcov/ .mypy_cache
+	@rm -rf .pytest_cache .ruff_cache .hypothesis build/ dist/ .eggs/ .coverage coverage.xml coverage.json htmlcov/ .mypy_cache
 	@find . -name '*.egg-info' -exec rm -rf {} +
 	@find . -name '*.egg' -exec rm -f {} +
 	@find . -name '*.pyc' -exec rm -f {} +
@@ -69,65 +80,74 @@ clean: 												## Cleanup temporary build artifacts
 	@find . -name '__pycache__' -exec rm -rf {} +
 	@find . -name '.pytest_cache' -exec rm -rf {} +
 	@find . -name '.ipynb_checkpoints' -exec rm -rf {} +
+	@echo "=> Source cleaned successfully"
+
+deep-clean: clean destroy-venv destroy-node_modules							## Clean everything up
+	@hatch python remove all
+	@echo "=> Hatch environments pruned and python installations trimmed"
+	@uv cache clean
+	@echo "=> UV Cache cleaned successfully"
 
 destroy-venv: 											## Destroy the virtual environment
-	@echo "=> Cleaning Python virtual environment"
-	@rm -rf .venv
+	@hatch env prune
+	@hatch env remove lint
+	@rm -Rf .venv
+	@rm -Rf .direnv
 
 destroy-node_modules: 											## Destroy the node environment
-	@echo "=> Cleaning Node modules"
-	@rm -rf node_modules
-
-migrations:       ## Generate database migrations
-	@echo "ATTENTION: This operation will create a new database migration for any defined models changes."
-	@while [ -z "$$MIGRATION_MESSAGE" ]; do read -r -p "Migration message: " MIGRATION_MESSAGE; done ;
-	@$(ENV_PREFIX)conduit database make-migrations --autogenerate -m "$${MIGRATION_MESSAGE}"
-
-.PHONY: migrate
-migrate:          ## Generate database migrations
-	@echo "ATTENTION: Will apply all database migrations."
-	@$(ENV_PREFIX)conduit database upgrade
+	@rm -rf node_modules .astro
 
 .PHONY: build
-build:
+build: clean        ## Build and package the collectors
+	@echo "=> Building assets..."
+	@if [ "$(USING_NPM)" ]; then echo "=> Building assets..."; npm run build; fi
 	@echo "=> Building package..."
-	@if [ "$(USING_PDM)" ]; then pdm build; fi
+	@hatch build
 	@echo "=> Package build complete..."
 
-.PHONY: refresh-lockfiles
-refresh-lockfiles:                                 ## Sync lockfiles with requirements files.
-	@pdm update --update-reuse --group :all
-
-.PHONY: lock
-lock:                                             ## Rebuild lockfiles from scratch, updating all dependencies
-	@pdm update --update-eager --group :all
-
-
-tidy: clean destroy-venv destroy-node_modules ## Clean up everything
-
-migrations:       ## Generate database migrations
-	@echo "ATTENTION: This operation will create a new database migration for any defined models changes."
-	@while [ -z "$$MIGRATION_MESSAGE" ]; do read -r -p "Migration message: " MIGRATION_MESSAGE; done ;
-	@$(ENV_PREFIX)app database make-migrations --autogenerate -m "$${MIGRATION_MESSAGE}"
-
-.PHONY: migrate
-migrate:          ## Generate database migrations
-	@echo "ATTENTION: Will apply all database migrations."
-	@$(ENV_PREFIX)app database upgrade
-
-.PHONY: build
-build:
-	@echo "=> Building package..."
-	@if [ "$(USING_PDM)" ]; then pdm build; fi
+.PHONY: build-all
+build-all: clean			## Build collector, wheel, and standalone collector binary
+	@$(MAKE) build-collector
+	@echo "=> Building sdist, wheel and binary packages..."
+	@scripts/build-binary-package.sh
 	@echo "=> Package build complete..."
 
-.PHONY: refresh-lockfiles
-refresh-lockfiles:                                 ## Sync lockfiles with requirements files.
-	@pdm update --update-reuse --group :all
 
-.PHONY: lock
-lock:                                             ## Rebuild lockfiles from scratch, updating all dependencies
-	@pdm update --update-eager --group :all
+.PHONY: pre-release
+pre-release:       ## bump the version and create the release tag
+	make docs
+	make clean
+	hatch run local:bump2version $(increment)
+	head .bumpversion.cfg | grep ^current_version
+	make build
+
+###############
+# docs        #
+###############
+.PHONY: doc-privs
+doc-privs:   ## Extract the list of privileges required from code and create the documentation
+	cat > docs/user_guide/oracle/permissions.md <<EOF
+	# Create a user for Collection
+
+	 The collection scripts can be executed with any DBA account. Alternatively, create a new user with the minimum privileges required.
+	 The included script sql/setup/grants_wrapper.sql will grant the privileges listed below.
+	 Please see the Database User Scripts page for information on how to create the user.
+
+	## Permissions Required
+
+	The following permissions are required for the script execution:
+
+	 EOF
+	 grep "rectype_(" scripts/collector/oracle/sql/setup/grants_wrapper.sql | grep -v FUNCTION | sed "s/rectype_(//g;s/),//g;s/)//g;s/'//g;s/,/ ON /1;s/,/./g" >> docs/user_guide/oracle/permissions.md
+
+.PHONY: serve-docs
+serve-docs:       ## Serve HTML documentation
+	@hatch run docs:serve
+
+.PHONY: docs
+docs:       ## generate HTML documentation and serve it to the browser
+	@hatch run docs:build
+
 
 # =============================================================================
 # Tests, Linting, Coverage
@@ -135,25 +155,13 @@ lock:                                             ## Rebuild lockfiles from scra
 .PHONY: lint
 lint: 												## Runs pre-commit hooks; includes ruff linting, codespell, black
 	@echo "=> Running pre-commit process"
-	@$(ENV_PREFIX)pre-commit run --all-files
+	@hatch run lint:fix
 	@echo "=> Pre-commit complete"
-
-.PHONY: format
-format: 												## Runs code formatting utilities
-	@echo "=> Running pre-commit process"
-	@$(ENV_PREFIX)ruff . --fix
-	@echo "=> Pre-commit complete"
-
-.PHONY: coverage
-coverage:  											## Run the tests and generate coverage report
-	@echo "=> Running tests with coverage"
-	@$(ENV_PREFIX)pytest tests --cov=app
-	@$(ENV_PREFIX)coverage html
-	@$(ENV_PREFIX)coverage xml
-	@echo "=> Coverage report generated"
 
 .PHONY: test
 test:  												## Run the tests
 	@echo "=> Running test cases"
-	@$(ENV_PREFIX)pytest tests
+	@docker-compose -f tests/docker-compose.yml up --force-recreate -d
+	@SKIP_DOCKER_COMPOSE=true hatch run test:cov
+	@docker-compose -f tests/docker-compose.yml down --remove-orphans
 	@echo "=> Tests complete"

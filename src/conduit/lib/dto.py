@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
     from litestar.dto import RenameStrategy
 
-__all__ = ["config", "dto_field", "DTOConfig", "SQLAlchemyDTO", "DataclassDTO", "MsgspecDTO"]
+__all__ = ["DTOConfig", "DataclassDTO", "MsgspecDTO", "SQLAlchemyDTO", "config", "dto_field"]
 
 DTOT = TypeVar("DTOT", bound=DataclassProtocol | DeclarativeBase)
 DTOFactoryT = TypeVar("DTOFactoryT", bound=DataclassDTO | SQLAlchemyDTO | MsgspecDTO)
@@ -30,8 +30,7 @@ def config(
     rename_strategy: RenameStrategy | None = None,
     max_nested_depth: int | None = None,
     partial: bool | None = None,
-) -> DTOConfig:
-    ...
+) -> DTOConfig: ...
 
 
 @overload
@@ -42,8 +41,7 @@ def config(
     rename_strategy: RenameStrategy | None = None,
     max_nested_depth: int | None = None,
     partial: bool | None = None,
-) -> SQLAlchemyDTOConfig:
-    ...
+) -> SQLAlchemyDTOConfig: ...
 
 
 @overload
@@ -54,8 +52,7 @@ def config(
     rename_strategy: RenameStrategy | None = None,
     max_nested_depth: int | None = None,
     partial: bool | None = None,
-) -> DTOConfig:
-    ...
+) -> DTOConfig: ...
 
 
 def config(

@@ -1,26 +1,23 @@
 # pylint: disable=[invalid-name,import-outside-toplevel]
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from litestar import Litestar
+from litestar.config.app import ExperimentalFeatures
+from litestar.openapi.config import OpenAPIConfig
 
-if TYPE_CHECKING:
-    from litestar import Litestar
+from conduit.__metadata__ import __project__, __version__
+from conduit.domain import plugins
+from conduit.domain.web.controllers import WebController
 
 
 def create_app() -> Litestar:
     """Create ASGI application."""
-    from litestar import Litestar
-    from litestar.config.app import ExperimentalFeatures
-    from litestar.openapi.config import OpenAPIConfig
-
-    from conduit.domain import plugins
-    from conduit.domain.web.controllers import WebController
 
     return Litestar(
         route_handlers=[WebController],
         openapi_config=OpenAPIConfig(
-            title="Realworld",
-            version="1.0.0",
+            title=__project__,
+            version=__version__,
             use_handler_docstrings=True,
             root_schema_site="swagger",
         ),

@@ -1,34 +1,84 @@
 """General utility functions."""
+
 from __future__ import annotations
 
-import pkgutil
 import platform
+import re
 import sys
-from functools import lru_cache
+import unicodedata
 from importlib import import_module
-from importlib.machinery import SourceFileLoader
+from importlib.util import find_spec
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from types import ModuleType
 
+__all__ = (
+    "check_email",
+    "import_string",
+    "module_to_os_path",
+    "slugify",
+)
 
-@lru_cache
+
+def check_email(email: str) -> str:
+    """Validate an email."""
+    if "@" not in email:
+        msg = "Invalid email!"
+        raise ValueError(msg)
+    return email.lower()
+
+
+def slugify(value: str, allow_unicode: bool = False, separator: str | None = None) -> str:
+    """slugify.
+
+    Convert to ASCII if ``allow_unicode`` is ``False``. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+
+    Args:
+        value (str): the string to slugify
+        allow_unicode (bool, optional): allow unicode characters in slug. Defaults to False.
+        separator (str, optional): by default a `-` is used to delimit word boundaries.
+            Set this to configure something different.
+
+    Returns:
+        str: a slugified string of the value parameter
+    """
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    if separator is not None:
+        return re.sub(r"[-\s]+", "-", value).strip("-_").replace("-", separator)
+    return re.sub(r"[-\s]+", "-", value).strip("-_")
+
+
 def module_to_os_path(dotted_path: str = "app") -> Path:
     """Find Module to OS Path.
 
-    Return path to the base directory of the project or the module
+    Return a path to the base directory of the project or the module
     specified by `dotted_path`.
 
-    Ensures that pkgutil returns a valid source file loader.
+    Args:
+        dotted_path (str, optional): The path to the module. Defaults to "app".
+
+    Raises:
+        TypeError: The module could not be found.
+
+    Returns:
+        Path: The path to the module.
     """
-    src = pkgutil.get_loader(dotted_path)
-    if not isinstance(src, SourceFileLoader):
+
+    src = find_spec(dotted_path)
+    if src is None:
         msg = "Couldn't find the path for %s"
         raise TypeError(msg, dotted_path)
     path_separator = "\\" if platform.system() == "Windows" else "/"
-    return Path(str(src.path).removesuffix(f"{path_separator}__init__.py"))
+    return Path(str(src.origin).removesuffix(f"{path_separator}__init__.py"))
 
 
 def import_string(dotted_path: str) -> Any:

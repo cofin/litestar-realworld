@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 from litestar.serialization import decode_json, encode_json
-from redis.asyncio import Redis
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -20,6 +19,8 @@ if TYPE_CHECKING:
 
 DEFAULT_MODULE_NAME = "app"
 BASE_DIR: Final[Path] = module_to_os_path(DEFAULT_MODULE_NAME)
+
+TRUE_VALUES = {"True", "true", "1", "yes", "Y", "T"}
 
 
 @dataclass
@@ -33,7 +34,7 @@ class DatabaseSettings:
     )
     """Enable SQLAlchemy connection pool logs."""
     POOL_DISABLED: bool = field(
-        default_factory=lambda: os.getenv("DATABASE_POOL_DISABLED", "False") in {"True", "1", "yes", "Y", "T"},
+        default_factory=lambda: os.getenv("DATABASE_POOL_DISABLED", "False") in TRUE_VALUES,
     )
     """Disable SQLAlchemy pool configuration."""
     POOL_MAX_OVERFLOW: int = field(default_factory=lambda: int(os.getenv("DATABASE_MAX_POOL_OVERFLOW", "10")))
@@ -45,17 +46,19 @@ class DatabaseSettings:
     POOL_RECYCLE: int = field(default_factory=lambda: int(os.getenv("DATABASE_POOL_RECYCLE", "300")))
     """Amount of time to wait before recycling connections."""
     POOL_PRE_PING: bool = field(
-        default_factory=lambda: os.getenv("DATABASE_PRE_POOL_PING", "False") in {"True", "1", "yes", "Y", "T"},
+        default_factory=lambda: os.getenv("DATABASE_PRE_POOL_PING", "False") in TRUE_VALUES,
     )
     """Optionally ping database before fetching a session from the connection pool."""
     URL: str = field(default_factory=lambda: os.getenv("DATABASE_URL", "sqlite+aiosqlite:///db.sqlite3"))
     """SQLAlchemy Database URL."""
-    MIGRATION_CONFIG: str = f"{BASE_DIR}/db/alembic.ini"
+    MIGRATION_CONFIG: str = f"{BASE_DIR}/db/migrations/alembic.ini"
     """The path to the `alembic.ini` configuration file."""
     MIGRATION_PATH: str = f"{BASE_DIR}/db/migrations"
     """The path to the `alembic` database migrations."""
     MIGRATION_DDL_VERSION_TABLE: str = "ddl_version"
     """The name to use for the `alembic` versions table name."""
+    FIXTURE_PATH: str = f"{BASE_DIR}/db/fixtures"
+    """The path to JSON fixture files to load into tables."""
     _engine_instance: AsyncEngine | None = None
     """SQLAlchemy engine instance generated from settings."""
 
@@ -175,11 +178,11 @@ class ViteSettings:
     """Server configurations."""
 
     DEV_MODE: bool = field(
-        default_factory=lambda: os.getenv("VITE_DEV_MODE", "False") in {"True", "1", "yes", "Y", "T"},
+        default_factory=lambda: os.getenv("VITE_DEV_MODE", "False") in TRUE_VALUES,
     )
     """Start `vite` development server."""
     USE_SERVER_LIFESPAN: bool = field(
-        default_factory=lambda: os.getenv("VITE_USE_SERVER_LIFESPAN", "True") in {"True", "1", "yes", "Y", "T"},
+        default_factory=lambda: os.getenv("VITE_USE_SERVER_LIFESPAN", "True") in TRUE_VALUES,
     )
     """Auto start and stop `vite` processes when running in development mode.."""
     HOST: str = field(default_factory=lambda: os.getenv("VITE_HOST", "0.0.0.0"))  # noqa: S104
@@ -187,20 +190,20 @@ class ViteSettings:
     PORT: int = field(default_factory=lambda: int(os.getenv("VITE_PORT", "5173")))
     """The port to start vite on.  Default to `5173`"""
     HOT_RELOAD: bool = field(
-        default_factory=lambda: os.getenv("VITE_HOT_RELOAD", "True") in {"True", "1", "yes", "Y", "T"},
+        default_factory=lambda: os.getenv("VITE_HOT_RELOAD", "True") in TRUE_VALUES,
     )
     """Start `vite` with HMR enabled."""
     ENABLE_REACT_HELPERS: bool = field(
-        default_factory=lambda: os.getenv("VITE_ENABLE_REACT_HELPERS", "False") in {"True", "1", "yes", "Y", "T"},
+        default_factory=lambda: os.getenv("VITE_ENABLE_REACT_HELPERS", "True") in TRUE_VALUES,
     )
     """Enable React support in HMR."""
-    BUNDLE_DIR: Path = field(default_factory=lambda: Path(f"{BASE_DIR}/domain/web/static"))
+    BUNDLE_DIR: Path = field(default_factory=lambda: Path(f"{BASE_DIR}/domain/web/public"))
     """Bundle directory"""
     RESOURCE_DIR: Path = field(default_factory=lambda: Path("resources"))
     """Resource directory"""
     TEMPLATE_DIR: Path = field(default_factory=lambda: Path(f"{BASE_DIR}/domain/web/templates"))
     """Template directory."""
-    ASSET_URL: str = field(default_factory=lambda: "/static/")
+    ASSET_URL: str = field(default_factory=lambda: os.getenv("ASSET_URL", "/static/"))
     """Base URL for assets"""
 
     @property
@@ -213,7 +216,7 @@ class ViteSettings:
 class ServerSettings:
     """Server configurations."""
 
-    APP_LOC: str = "app.asgi:app"
+    APP_LOC: str = "conduit.asgi:app"
     """Path to app executable, or factory."""
     APP_LOC_IS_FACTORY: bool = False
     """Indicate if APP_LOC points to an executable or factory."""
@@ -224,7 +227,7 @@ class ServerSettings:
     KEEPALIVE: int = field(default_factory=lambda: int(os.getenv("LITESTAR_KEEPALIVE", "65")))
     """Seconds to hold connections open (65 is > AWS lb idle timeout)."""
     RELOAD: bool = field(
-        default_factory=lambda: os.getenv("LITESTAR_RELOAD", "False") in {"True", "1", "yes", "Y", "T"},
+        default_factory=lambda: os.getenv("LITESTAR_RELOAD", "False") in TRUE_VALUES,
     )
     """Turn on hot reloading."""
     RELOAD_DIRS: list[str] = field(default_factory=lambda: [f"{BASE_DIR}"])
@@ -233,6 +236,30 @@ class ServerSettings:
         default_factory=lambda: int(os.getenv("WEB_CONCURRENCY")) if os.getenv("WEB_CONCURRENCY") is not None else None,  # type: ignore[arg-type]
     )
     """Number of HTTP Worker processes to be spawned by Uvicorn."""
+
+
+@dataclass
+class SaqSettings:
+    """Server configurations."""
+
+    PROCESSES: int = field(default_factory=lambda: int(os.getenv("SAQ_PROCESSES", "1")))
+    """The number of worker processes to start.
+
+    Default is set to 1.
+    """
+    CONCURRENCY: int = field(default_factory=lambda: int(os.getenv("SAQ_CONCURRENCY", "10")))
+    """The number of concurrent jobs allowed to execute per worker process.
+
+    Default is set to 10.
+    """
+    WEB_ENABLED: bool = field(
+        default_factory=lambda: os.getenv("SAQ_WEB_ENABLED", "True") in TRUE_VALUES,
+    )
+    """If true, the worker admin UI is hosted on worker startup."""
+    USE_SERVER_LIFESPAN: bool = field(
+        default_factory=lambda: os.getenv("SAQ_USE_SERVER_LIFESPAN", "True") in TRUE_VALUES,
+    )
+    """Auto start and stop `saq` processes when starting the Litestar application."""
 
 
 @dataclass
@@ -255,25 +282,6 @@ class LogSettings:
     """Request cookie keys to obfuscate."""
     OBFUSCATE_HEADERS: set[str] = field(default_factory=lambda: {"Authorization", "X-API-KEY"})
     """Request header keys to obfuscate."""
-    JOB_FIELDS: list[str] = field(
-        default_factory=lambda: [
-            "function",
-            "kwargs",
-            "key",
-            "scheduled",
-            "attempts",
-            "completed",
-            "queued",
-            "started",
-            "result",
-            "error",
-        ],
-    )
-    """Attributes of the SAQ.
-
-    [`Job`](https://github.com/tobymao/saq/blob/master/saq/job.py) to be
-    logged.
-    """
     REQUEST_FIELDS: list[RequestExtractorField] = field(
         default_factory=lambda: [
             "path",
@@ -297,54 +305,12 @@ class LogSettings:
     )
     """Attributes of the [Response][litestar.response.Response] to be
     logged."""
-    WORKER_EVENT: str = "Worker"
-    """Log event name for logs from SAQ worker."""
-    SAQ_LEVEL: int = 20
-    """Level to log SAQ logs."""
-    SQLALCHEMY_LEVEL: int = 30
+    SQLALCHEMY_LEVEL: int = 20
     """Level to log SQLAlchemy logs."""
-    UVICORN_ACCESS_LEVEL: int = 30
-    """Level to log uvicorn access logs."""
-    UVICORN_ERROR_LEVEL: int = 20
-    """Level to log uvicorn error logs."""
     GRANIAN_ACCESS_LEVEL: int = 30
     """Level to log uvicorn access logs."""
     GRANIAN_ERROR_LEVEL: int = 20
     """Level to log uvicorn error logs."""
-
-
-@dataclass
-class RedisSettings:
-    URL: str = field(default_factory=lambda: os.getenv("REDIS_URL", "redis://localhost:6379/0"))
-    """A Redis connection URL."""
-    SOCKET_CONNECT_TIMEOUT: int = field(default_factory=lambda: int(os.getenv("REDIS_CONNECT_TIMEOUT", "5")))
-    """Length of time to wait (in seconds) for a connection to become
-    active."""
-    HEALTH_CHECK_INTERVAL: int = field(default_factory=lambda: int(os.getenv("REDIS_HEALTH_CHECK_INTERVAL", "5")))
-    """Length of time to wait (in seconds) before testing connection health."""
-    SOCKET_KEEPALIVE: bool = field(
-        default_factory=lambda: os.getenv("REDIS_SOCKET_KEEPALIVE", "True") in {"True", "1", "yes", "Y", "T"},
-    )
-    """Length of time to wait (in seconds) between keepalive commands."""
-    _redis_instance: Redis | None = None
-    """Redis instance generated from settings."""
-
-    @property
-    def client(self) -> Redis:
-        return self.get_client()
-
-    def get_client(self) -> Redis:
-        if self._redis_instance is not None:
-            return self._redis_instance
-        self._redis_instance = Redis.from_url(
-            url=self.URL,
-            encoding="utf-8",
-            decode_responses=False,
-            socket_connect_timeout=self.SOCKET_CONNECT_TIMEOUT,
-            socket_keepalive=self.SOCKET_KEEPALIVE,
-            health_check_interval=self.HEALTH_CHECK_INTERVAL,
-        )
-        return self._redis_instance
 
 
 @dataclass
@@ -353,15 +319,15 @@ class AppSettings:
 
     URL: str = field(default_factory=lambda: os.getenv("APP_URL", "http://localhost:8000"))
     """The frontend base URL"""
-    DEBUG: bool = field(default_factory=lambda: os.getenv("LITESTAR_DEBUG", "False") in {"True", "1", "yes", "Y", "T"})
+    DEBUG: bool = field(default_factory=lambda: os.getenv("LITESTAR_DEBUG", "False") in TRUE_VALUES)
     """Run `Litestar` with `debug=True`."""
     SECRET_KEY: str = field(
         default_factory=lambda: os.getenv("SECRET_KEY", binascii.hexlify(os.urandom(32)).decode(encoding="utf-8")),
     )
     """Application secret key."""
-    NAME: str = field(default_factory=lambda: "conduit")
+    NAME: str = field(default_factory=lambda: "app")
     """Application name."""
-    ALLOWED_CORS_ORIGINS: list[str] | str = field(default_factory=lambda: os.getenv("BACKEND_CORS_ORIGINS", '["*"]'))
+    ALLOWED_CORS_ORIGINS: list[str] | str = field(default_factory=lambda: os.getenv("ALLOWED_CORS_ORIGINS", '["*"]'))
     """Allowed CORS Origins"""
     CSRF_COOKIE_NAME: str = field(default_factory=lambda: "csrftoken")
     """CSRF Cookie Name"""
@@ -396,18 +362,21 @@ class Settings:
     vite: ViteSettings = field(default_factory=ViteSettings)
     server: ServerSettings = field(default_factory=ServerSettings)
     log: LogSettings = field(default_factory=LogSettings)
-    redis: RedisSettings = field(default_factory=RedisSettings)
 
     @classmethod
-    @lru_cache(maxsize=1, typed=True)
     def from_env(cls, dotenv_filename: str = ".env") -> Settings:
-        from litestar.cli._utils import console
+        from litestar.cli._utils import console  # noqa: PLC2701, PLC0415
 
         env_file = Path(f"{os.curdir}/{dotenv_filename}")
         if env_file.is_file():
-            from dotenv import load_dotenv
+            from dotenv import load_dotenv  # noqa: PLC0415
 
             console.print(f"[yellow]Loading environment configuration from {dotenv_filename}[/]")
 
             load_dotenv(env_file)
         return Settings()
+
+
+@lru_cache(maxsize=1, typed=True)
+def get_settings() -> Settings:
+    return Settings.from_env()

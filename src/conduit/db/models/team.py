@@ -6,7 +6,7 @@ from advanced_alchemy.base import UUIDAuditBase
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.models.base import SlugKey
+from conduit.db.models.base import SlugKey
 
 from .team_tag import team_tag
 

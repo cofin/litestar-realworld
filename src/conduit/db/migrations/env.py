@@ -45,7 +45,7 @@ def order_columns(
     op: ops.CreateTableOp,
 ) -> ops.CreateTableOp:
     """Orders ID first and the audit columns at the end."""
-    special_names = {"id": -100, "sa_orm_sentinel": 3001, "created_at": 3002, "updated_at": 3002}
+    special_names = {"id": 1, "sa_orm_sentinel": 3001, "created_at": 3002, "updated_at": 3002}
     cols_by_key = [
         (
             special_names.get(col.key, index) if isinstance(col, Column) else 2000,
@@ -58,7 +58,6 @@ def order_columns(
         op.table_name,
         columns,
         schema=op.schema,
-        # TODO: Remove when https://github.com/sqlalchemy/alembic/issues/1193 is fixed
         _namespace_metadata=op._namespace_metadata,
         **op.kw,
     )
